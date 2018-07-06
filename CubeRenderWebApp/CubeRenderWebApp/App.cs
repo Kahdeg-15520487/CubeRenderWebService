@@ -47,7 +47,7 @@ namespace renderCube
                      && double.TryParse(inputY.Value, out double y)
                      && double.TryParse(inputZ.Value, out double z))
                     {
-                        string url = "http://anchat.azurewebsites.net/api/render/" + $"{x}/{y}/{z}";
+                        string url = "https://anchat.azurewebsites.net/api/render/" + $"{x}/{y}/{z}";
 
                         jQuery.GetJSON(
                             url, null,
@@ -68,10 +68,13 @@ namespace renderCube
             };
 
             // Add the Button to the page
+            div.AppendChild(new HTMLLabelElement { TextContent = "X:" });
             div.AppendChild(inputX);
             div.AppendChild(new HTMLBRElement());
+            div.AppendChild(new HTMLLabelElement { TextContent = "Y:" });
             div.AppendChild(inputY);
             div.AppendChild(new HTMLBRElement());
+            div.AppendChild(new HTMLLabelElement { TextContent = "Z:" });
             div.AppendChild(inputZ);
             div.AppendChild(new HTMLBRElement());
             div.AppendChild(button);
