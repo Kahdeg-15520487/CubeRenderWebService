@@ -22,6 +22,9 @@ env:
   # Fail the build if the triggering commit isn't signed. Set to 'false' to skip
   # (turning the commit check into a warning) — handy while onboarding.
   REQUIRE_SIGNED_COMMIT: 'true'
+  # cosign keypair is injected as secrets and read by cosign via env://COSIGN_PRIVATE_KEY
+  COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+  COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
 
 jobs:
   build-sign-attest:
