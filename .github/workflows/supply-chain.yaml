@@ -47,19 +47,6 @@ jobs:
           fi
 
       # ---- 2. login to Harbor --------------------------------------------
-      # sanity: confirm the secret actually holds the expected token (hash only, never plaintext)
-      - name: Check HARBOR_PUSH_PASS hash (no plaintext)
-        run: |
-          EXPECTED="d4f059394e03ad69d4a245b2273258f9"   # md5 of the expected robot token
-          ACTUAL="$(printf '%s' "${{ secrets.HARBOR_PUSH_PASS }}" | md5sum | awk '{print $1}')"
-          echo "expected=$EXPECTED"
-          echo "actual=$ACTUAL"
-          if [ "$ACTUAL" = "$EXPECTED" ]; then
-            echo "::notice::HARBOR_PUSH_PASS matches expected token"
-          else
-            echo "::error::HARBOR_PUSH_PASS does NOT match expected token"
-            exit 1
-          fi
       - name: Login to Harbor
         run: echo "${{ secrets.HARBOR_PUSH_PASS }}" | docker login "$REG" -u 'robot$supply+supply-push' --password-stdin
 
