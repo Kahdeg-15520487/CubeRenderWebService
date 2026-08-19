@@ -33,21 +33,18 @@ jobs:
       - uses: sigstore/cosign-installer@v3
       - uses: anchore/sbom-action/download-syft@v0
 
-      # ---- 1. guard: the commit must be sigstore-signed (gitsign) --------
-      - name: Install gitsign
+      # ---- 1. guard: the commit must be SSH-signed by the workflow author ----
+      - name: Verify commit signature (SSH)
         run: |
-          curl -sSLo /tmp/gitsign https://github.com/sigstore/gitsign/releases/download/v0.17.1/gitsign_0.17.1_linux_amd64
-          chmod +x /tmp/gitsign
-          sudo mv /tmp/gitsign /usr/local/bin/gitsign
-      - name: Verify commit signature (gitsign)
-        run: |
-          gitsign verify "${GITHUB_SHA}" || {
-            echo "::warning::commit ${GITHUB_SHA} is NOT signed via sigstore"
+          # trust the SSH signing keys GitHub publishes for this account
+          curl -sL "https://github.com/${GITHUB_ACTOR}.keys" | sed 's/^/* /' > /tmp/allowed_signers
+          if ! git -c gpg.ssh.allowedSignersFile=/tmp/allowed_signers verify-commit "${GITHUB_SHA}"; then
+            echo "::warning::commit ${GITHUB_SHA} is NOT SSH-signed"
             if [ "${{ env.REQUIRE_SIGNED_COMMIT }}" = "true" ]; then
               echo "::error::blocked: unsigned commit"
               exit 1
             fi
-          }
+          fi
 
       # ---- 2. login to Harbor --------------------------------------------
       - name: Login to Harbor

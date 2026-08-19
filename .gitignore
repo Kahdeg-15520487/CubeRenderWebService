@@ -341,3 +341,4 @@ frontend/dist/
 # cosign signing keys (private!)
 cosign.key
 cosign.key.password
+cosign.pub
