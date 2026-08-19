@@ -69,8 +69,7 @@ jobs:
       - name: Sign (backend)
         run: cosign sign --key env://COSIGN_PRIVATE_KEY --yes "${{ steps.backend.outputs.image }}"
       - name: Attest SBOM (backend)
-        run: cosign attest --key env://COSIGN_PRIVATE_KEY --type spdxjson \
-             --predicate sbom-backend.spdx.json "${{ steps.backend.outputs.image }}"
+        run: cosign attest --key env://COSIGN_PRIVATE_KEY --type spdxjson --predicate sbom-backend.spdx.json "${{ steps.backend.outputs.image }}"
       - name: Attest SLSA provenance (backend)
         run: |
           cat > prov-backend.json <<'EOF'
@@ -110,8 +109,7 @@ jobs:
       - name: Sign (frontend)
         run: cosign sign --key env://COSIGN_PRIVATE_KEY --yes "${{ steps.frontend.outputs.image }}"
       - name: Attest SBOM (frontend)
-        run: cosign attest --key env://COSIGN_PRIVATE_KEY --type spdxjson \
-             --predicate sbom-frontend.spdx.json "${{ steps.frontend.outputs.image }}"
+        run: cosign attest --key env://COSIGN_PRIVATE_KEY --type spdxjson --predicate sbom-frontend.spdx.json "${{ steps.frontend.outputs.image }}"
       - name: Attest SLSA provenance (frontend)
         run: |
           cat > prov-frontend.json <<'EOF'
