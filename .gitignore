@@ -338,3 +338,6 @@ frontend/dist/
 # .NET
 **/bin/
 **/obj/
+# cosign signing keys (private!)
+cosign.key
+cosign.key.password
