@@ -1,0 +1,16 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Node
+**/node_modules/
+frontend/dist/
+
+# Git, CI junk
+.git/
+.github/
+*.md
+
+# editor
+.vs/
+.idea/

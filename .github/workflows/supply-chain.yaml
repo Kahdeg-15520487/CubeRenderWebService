@@ -1,0 +1,137 @@
+# Supply-chain demo:
+#   signed commit -> build both images -> syft SBOM -> cosign sign -> in-toto attestations
+#   (SBOM + SLSA provenance) -> push signature/attestations to Harbor
+# Both a .NET backend and a Node/React frontend get their own SBOM + signature, proving
+# the flow works across two different dependency ecosystems.
+
+name: supply-chain
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # keyless OIDC (workload identity) for cosign <-> sigstore
+  contents: read
+
+env:
+  REG: harbor.minhnguyenle.net
+  PROJECT: supply
+  SHA: sha-${{ github.sha }}
+  # Fail the build if the triggering commit isn't signed. Set to 'false' to skip
+  # (turning the commit check into a warning) — handy while onboarding.
+  REQUIRE_SIGNED_COMMIT: 'true'
+
+jobs:
+  build-sign-attest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # cosign (signing) + syft (SBOM)
+      - uses: sigstore/cosign-installer@v3
+      - uses: anchore/sbom-action/download-syft@v0
+
+      # ---- 1. guard: the commit must be signed (gitsign/GPG/SSH) ----------
+      - name: Verify commit signature
+        run: |
+          if ! git verify-commit "${GITHUB_SHA}"; then
+            echo "::warning::commit ${GITHUB_SHA} is NOT signed"
+            if [ "${{ env.REQUIRE_SIGNED_COMMIT }}" = "true" ]; then
+              echo "::error::blocked: unsigned commit"
+              exit 1
+            fi
+          fi
+
+      # ---- 2. login to Harbor --------------------------------------------
+      - name: Login to Harbor
+        run: echo "${{ secrets.HARBOR_PUSH_PASS }}" | docker login "$REG" -u "robot$supply-push" --password-stdin
+
+      ########################################################################
+      #  BACKEND — .NET / nuget                                               #
+      ########################################################################
+      - name: Build + push backend
+        id: backend
+        run: |
+          IMG="$REG/$PROJECT/cuberender-api:$SHA"
+          docker build -f backend/Dockerfile -t "$IMG" .
+          docker push "$IMG"
+          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMG")"
+          echo "image=$DIGEST" >> "$GITHUB_OUTPUT"
+      - name: SBOM (backend)
+        run: syft scan "${{ steps.backend.outputs.image }}" -o spdx-json --file sbom-backend.spdx.json
+      - name: Sign (backend)
+        run: cosign sign --key env://COSIGN_PRIVATE_KEY --yes "${{ steps.backend.outputs.image }}"
+      - name: Attest SBOM (backend)
+        run: cosign attest --key env://COSIGN_PRIVATE_KEY --type spdxjson \
+             --predicate sbom-backend.spdx.json "${{ steps.backend.outputs.image }}"
+      - name: Attest SLSA provenance (backend)
+        run: |
+          cat > prov-backend.json <<'EOF'
+          {
+            "buildDefinition": {
+              "buildType": "https://github.com/actions/runner@v1",
+              "externalParameters": {
+                "repo": "${{ github.repository }}",
+                "sha": "${{ github.sha }}",
+                "ref": "${{ github.ref }}",
+                "workflow": "${{ github.workflow }}"
+              },
+              "internalParameters": { "ci": "github-actions" }
+            },
+            "runDetails": {
+              "builder": { "id": "https://github.com/actions" },
+              "metadata": { "invocationId": "${{ github.run_id }}" }
+            }
+          }
+          EOF
+          cosign attest --key env://COSIGN_PRIVATE_KEY --type slsaprovenance1 \
+             --predicate prov-backend.json "${{ steps.backend.outputs.image }}"
+
+      ########################################################################
+      #  FRONTEND — Node / npm                                                #
+      ########################################################################
+      - name: Build + push frontend
+        id: frontend
+        run: |
+          IMG="$REG/$PROJECT/cuberender-web:$SHA"
+          docker build -f frontend/Dockerfile -t "$IMG" frontend/
+          docker push "$IMG"
+          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMG")"
+          echo "image=$DIGEST" >> "$GITHUB_OUTPUT"
+      - name: SBOM (frontend)
+        run: syft scan "${{ steps.frontend.outputs.image }}" -o spdx-json --file sbom-frontend.spdx.json
+      - name: Sign (frontend)
+        run: cosign sign --key env://COSIGN_PRIVATE_KEY --yes "${{ steps.frontend.outputs.image }}"
+      - name: Attest SBOM (frontend)
+        run: cosign attest --key env://COSIGN_PRIVATE_KEY --type spdxjson \
+             --predicate sbom-frontend.spdx.json "${{ steps.frontend.outputs.image }}"
+      - name: Attest SLSA provenance (frontend)
+        run: |
+          cat > prov-frontend.json <<'EOF'
+          {
+            "buildDefinition": {
+              "buildType": "https://github.com/actions/runner@v1",
+              "externalParameters": {
+                "repo": "${{ github.repository }}",
+                "sha": "${{ github.sha }}",
+                "ref": "${{ github.ref }}",
+                "workflow": "${{ github.workflow }}"
+              },
+              "internalParameters": { "ci": "github-actions" }
+            },
+            "runDetails": {
+              "builder": { "id": "https://github.com/actions" },
+              "metadata": { "invocationId": "${{ github.run_id }}" }
+            }
+          }
+          EOF
+          cosign attest --key env://COSIGN_PRIVATE_KEY --type slsaprovenance1 \
+             --predicate prov-frontend.json "${{ steps.frontend.outputs.image }}"
+
+      # ---- 3. (optional) manual verification summary ----------------------
+      - name: Verify both images (fails the pipeline if a signature is bad)
+        run: |
+          cosign verify --key "${{ secrets.COSIGN_PUBLIC_KEY_FILE }}" "$REG/$PROJECT/cuberender-api:$SHA"
+          cosign verify --key "${{ secrets.COSIGN_PUBLIC_KEY_FILE }}" "$REG/$PROJECT/cuberender-web:$SHA"
