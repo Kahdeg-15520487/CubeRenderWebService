@@ -33,16 +33,21 @@ jobs:
       - uses: sigstore/cosign-installer@v3
       - uses: anchore/sbom-action/download-syft@v0
 
-      # ---- 1. guard: the commit must be signed (gitsign/GPG/SSH) ----------
-      - name: Verify commit signature
+      # ---- 1. guard: the commit must be sigstore-signed (gitsign) --------
+      - name: Install gitsign
         run: |
-          if ! git verify-commit "${GITHUB_SHA}"; then
-            echo "::warning::commit ${GITHUB_SHA} is NOT signed"
+          curl -sSLo /tmp/gitsign https://github.com/sigstore/gitsign/releases/download/v0.17.1/gitsign_0.17.1_linux_amd64
+          chmod +x /tmp/gitsign
+          sudo mv /tmp/gitsign /usr/local/bin/gitsign
+      - name: Verify commit signature (gitsign)
+        run: |
+          gitsign verify "${GITHUB_SHA}" || {
+            echo "::warning::commit ${GITHUB_SHA} is NOT signed via sigstore"
             if [ "${{ env.REQUIRE_SIGNED_COMMIT }}" = "true" ]; then
               echo "::error::blocked: unsigned commit"
               exit 1
             fi
-          fi
+          }
 
       # ---- 2. login to Harbor --------------------------------------------
       - name: Login to Harbor
