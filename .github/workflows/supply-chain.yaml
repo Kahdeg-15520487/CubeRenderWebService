@@ -48,7 +48,7 @@ jobs:
 
       # ---- 2. login to Harbor --------------------------------------------
       - name: Login to Harbor
-        run: echo "${{ secrets.HARBOR_PUSH_PASS }}" | docker login "$REG" -u 'robot$supply-push' --password-stdin
+        run: echo "${{ secrets.HARBOR_PUSH_PASS }}" | docker login "$REG" -u 'robot$supply+supply-push' --password-stdin
 
       ########################################################################
       #  BACKEND — .NET / nuget                                               #
