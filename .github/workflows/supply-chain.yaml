@@ -136,5 +136,6 @@ jobs:
       # ---- 3. (optional) manual verification summary ----------------------
       - name: Verify both images (fails the pipeline if a signature is bad)
         run: |
-          cosign verify --key "${{ secrets.COSIGN_PUBLIC_KEY_FILE }}" "$REG/$PROJECT/cuberender-api:$SHA"
-          cosign verify --key "${{ secrets.COSIGN_PUBLIC_KEY_FILE }}" "$REG/$PROJECT/cuberender-web:$SHA"
+          printf '%s\n' "${{ secrets.COSIGN_PUBLIC_KEY_FILE }}" > /tmp/cosign.pub
+          cosign verify --key /tmp/cosign.pub "$REG/$PROJECT/cuberender-api:$SHA"
+          cosign verify --key /tmp/cosign.pub "$REG/$PROJECT/cuberender-web:$SHA"
